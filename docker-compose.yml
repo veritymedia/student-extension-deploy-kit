@@ -1,0 +1,90 @@
+# Student Extension Deploy Kit (ADR-0012): a school runs the stack
+# from pinned public images built by the project's CI — this repo
+# never builds from source. `docker compose up` (after copying
+# .env.example to .env per README.md) starts the Student Extension
+# server + the runner sidecar. PocketBase admin console:
+# http://<host>:8090/_/ · pb_data survives restarts via the named
+# volume.
+#
+# Port is published on 0.0.0.0 so the server is reachable over
+# Tailscale when the stack runs on a remote box. If the host has a
+# public interface, restrict exposure with a firewall (or bind to the
+# Tailscale IP instead).
+services:
+  server:
+    # Pinned GHCR images (updates = bump both tags; see README § Update).
+    image: ghcr.io/veritymedia/student-extension-server:v1.0.0
+    ports:
+      - "0.0.0.0:8090:8090"
+    networks:
+      - frontend
+      - internal
+    # SSO config: the single Workspace domain logins are gated to,
+    # plus the Google OAuth2 client. Unset vars keep SSO disabled
+    # (the server fails closed).
+    environment:
+      SE_WORKSPACE_DOMAIN: ${SE_WORKSPACE_DOMAIN:-}
+      SE_GOOGLE_CLIENT_ID: ${SE_GOOGLE_CLIENT_ID:-}
+      SE_GOOGLE_CLIENT_SECRET: ${SE_GOOGLE_CLIENT_SECRET:-}
+      # ADR-0003: the runner sidecar's POST /run endpoint, reached over
+      # the internal-only network. Unset = marking cannot run (Submissions
+      # land in the retryable marking-failed state instead).
+      SE_RUNNER_URL: ${SE_RUNNER_URL:-http://runner:8080/run}
+    volumes:
+      - pb_data:/app/pb_data
+    restart: unless-stopped
+    depends_on:
+      - runner
+    # Logs are for security + error diagnosis ONLY (never request
+    # bodies or student code) and rotate by staying bounded: a few
+    # small files, roughly the last month at typical school traffic.
+    # Dial up/down via max-size/max-file (see README § Privacy).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # The runner sidecar (ADR-0003): executes untrusted student Python for
+  # Marking. NO ports section on purpose — it joins ONLY the internal
+  # network, so nothing outside the compose project can reach it; the
+  # server is its one caller and its hostname is "runner". It carries
+  # NO app-level auth either: POST /run trusts the internal network
+  # alone (ADR-0003) — whatever can reach it could equally reach the
+  # server on that network, and the data it holds (the Draft's own
+  # files the server already sent) is worthless to an attacker without
+  # the server's auth anyway.
+  runner:
+    image: ghcr.io/veritymedia/student-extension-runner:v1.0.0
+    networks:
+      - internal
+    # the ADR-0003 container limits: no swap (memswap == mem), a CPU
+    # share, a process ceiling, a read-only root filesystem with a tmpfs
+    # workdir (the only writable place), an init to reap orphans, and
+    # zero Linux capabilities.
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    init: true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pb_data:
+
+networks:
+  # the network the server publishes 8090 on (host's own interface)
+  frontend:
+  # server ↔ runner only — no gateway to the host network
+  internal:
+    internal: true
