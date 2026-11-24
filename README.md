@@ -8,7 +8,7 @@ Self-host the **Student Extension** server for your school: GCSE Computer Scienc
 
 - A server (a small VPS is plenty) reachable from school and student homes, with **Docker Engine + the compose plugin** installed (`docker compose version` must answer).
 - **Google Workspace admin rights** (to create an OAuth client) — or a friendly IT colleague who has them.
-- The VS Code extension on every teacher's and student's machine (Marketplace listing linked from the project README).
+- The VS Code extension on every teacher's and student's machine — [Student Extension on the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=veritymedia.student-extension) (pre-release channel; while that is being set up, a `.vsix` from the GitHub Releases of this project is the fallback — sideloaded VSIXs get no auto-update).
 
 ## 1 · Create the Google OAuth client
 
@@ -53,7 +53,8 @@ Only accounts whose email ends in your `SE_WORKSPACE_DOMAIN` can sign in at all.
 
 The stack runs **pinned images** — updates never arrive by surprise:
 
-1. Check the project's GitHub releases for a new `vX.Y.Z` tag (images are published to `ghcr.io` per release).2. Edit `docker-compose.yml` — bump the two `image:` tags (`student-extension-server` and `student-extension-runner`) to the same version.
+1. Check the project's GitHub releases for a new `vX.Y.Z` tag (images are published to `ghcr.io` per release).
+2. Edit `docker-compose.yml` — bump the two `image:` tags (`student-extension-server` and `student-extension-runner`) to the same version.
 3. `docker compose pull && docker compose up -d`. Data survives (`pb_data` volume).
 
 ## Privacy
@@ -76,7 +77,7 @@ Plain answers, because this holds children's work (the project's ADR-0014; the D
 
 ## License
 
-No open-source license is declared yet — the kit and the containers it pins are © Verity Media, all rights reserved. Schools may deploy and run this kit for their own teaching. The license decision lives with the main project and will land here when made.
+MIT, © Verity Media — this kit, the server containers it pins, and the Student Extension itself. The full license text ships inside the extension's Marketplace package (shown at install time) and as the `LICENSE` file of the main project. Deploy, run, and fork freely; note that [Privacy](#privacy) section or not, **you** remain the data controller for your students' data.
 
 ## Support
 
